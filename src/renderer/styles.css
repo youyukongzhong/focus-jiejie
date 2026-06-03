@@ -208,6 +208,11 @@ h2 {
   color: #ffe2a0;
 }
 
+.settings-btn {
+  min-height: 30px;
+  font-weight: 800;
+}
+
 .main-grid {
   min-height: 0;
   overflow: hidden;
@@ -1094,6 +1099,122 @@ button:not(:disabled):hover {
   padding: 0 24px 14px;
   color: var(--subtle);
   font-size: 12px;
+}
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(7, 12, 14, 0.58);
+}
+
+.settings-backdrop[hidden] {
+  display: none;
+}
+
+.settings-panel {
+  width: min(430px, calc(100vw - 36px));
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(45, 69, 72, 0.95);
+  border-radius: 8px;
+  background: #152023;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+}
+
+.settings-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.close-settings {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #10191c;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.settings-switch {
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(45, 69, 72, 0.75);
+  border-radius: 8px;
+  background: #10191c;
+}
+
+.settings-switch strong,
+.settings-switch small {
+  display: block;
+}
+
+.settings-switch small {
+  margin-top: 5px;
+  color: var(--subtle);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-switch i {
+  width: 46px;
+  height: 26px;
+  position: relative;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #26383c;
+}
+
+.settings-switch i::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: var(--muted);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.settings-switch input:checked + i {
+  border-color: rgba(48, 200, 166, 0.62);
+  background: rgba(48, 200, 166, 0.17);
+}
+
+.settings-switch input:checked + i::after {
+  transform: translateX(20px);
+  background: var(--teal);
+}
+
+.settings-switch input:disabled + i {
+  opacity: 0.42;
+}
+
+.settings-status {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 #errorBox {

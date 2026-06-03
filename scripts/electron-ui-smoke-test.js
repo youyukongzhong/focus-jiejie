@@ -82,6 +82,8 @@ async function inspectLayout(win) {
       sidePanelBodiesScroll: panelBodies.length === 4 && panelBodies.every((item) => item.overflowY === 'auto'),
       brandHasGraphic: Boolean(document.querySelector('.brand-shield') && document.querySelector('.brand-core') && brandText === ''),
       addDomainButtonExists: Boolean(document.getElementById('addDomainBtn')),
+      settingsButtonExists: Boolean(document.getElementById('settingsBtn')),
+      startupToggleExists: Boolean(document.getElementById('startupToggle')),
       reportHintVisible: Boolean(document.querySelector('.report-hint')),
       sections,
       panelBodies,
@@ -102,6 +104,21 @@ async function testAddDomain(win) {
       previewHasGoogle: Array.from(document.querySelectorAll('#domainList li')).some((item) => item.textContent.trim() === 'www.google.com'),
       domainCount: document.getElementById('domainCount').textContent.trim(),
     };
+  })()`, true);
+}
+
+async function testStartupSetting(win) {
+  return win.webContents.executeJavaScript(`(() => {
+    document.getElementById('settingsBtn').click();
+    const dialog = document.getElementById('settingsDialog');
+    const toggle = document.getElementById('startupToggle');
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change', { bubbles: true }));
+    return new Promise((resolve) => setTimeout(() => resolve({
+      dialogVisible: !dialog.hidden,
+      toggleChecked: toggle.checked,
+      statusText: document.getElementById('startupStatus').textContent.trim(),
+    }), 60));
   })()`, true);
 }
 
@@ -134,10 +151,16 @@ async function main() {
   assert(desktopLayout.sidePanelBodiesScroll, 'right side panel bodies are not scrollable');
   assert(desktopLayout.brandHasGraphic, 'brand mark did not render the app graphic');
   assert(desktopLayout.addDomainButtonExists, 'domain add button is missing');
+  assert(desktopLayout.settingsButtonExists, 'settings button is missing');
+  assert(desktopLayout.startupToggleExists, 'startup toggle is missing');
 
   const addDomain = await testAddDomain(win);
   assert(addDomain.hidden === 'www.google.com', `unexpected normalized domain payload: ${addDomain.hidden}`);
   assert(addDomain.previewHasGoogle, 'domain preview did not include the added domain');
+
+  const startupSetting = await testStartupSetting(win);
+  assert(startupSetting.dialogVisible, 'settings dialog did not open');
+  assert(startupSetting.toggleChecked, 'startup toggle did not stay enabled');
 
   const activeState = await win.webContents.executeJavaScript(`window.focusJiejie.setSmokeState({
     hostsManaged: true,
@@ -194,7 +217,7 @@ async function main() {
     assert(layout.reportHintVisible, `browser restart notice is missing in ${label}`);
   }
 
-  console.log(JSON.stringify({ ok: true, desktopLayout, addDomain, activeLayouts }, null, 2));
+  console.log(JSON.stringify({ ok: true, desktopLayout, addDomain, startupSetting, activeLayouts }, null, 2));
 }
 
 main()

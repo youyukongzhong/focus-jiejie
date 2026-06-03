@@ -1,6 +1,11 @@
 const elements = {
   adminBadge: document.getElementById('adminBadge'),
   hostsBadge: document.getElementById('hostsBadge'),
+  settingsBtn: document.getElementById('settingsBtn'),
+  settingsDialog: document.getElementById('settingsDialog'),
+  closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+  startupToggle: document.getElementById('startupToggle'),
+  startupStatus: document.getElementById('startupStatus'),
   statusLine: document.getElementById('statusLine'),
   wardStage: document.getElementById('wardStage'),
   progressRing: document.getElementById('progressRing'),
@@ -258,6 +263,11 @@ function render(state) {
   elements.restoreBtn.disabled = busy || (!state.hostsManaged && !needsRestore);
   elements.repairBtn.disabled = active || busy || needsRestore;
 
+  const startup = state.startup || { supported: false, enabled: false, error: '' };
+  elements.startupToggle.checked = Boolean(startup.enabled);
+  elements.startupToggle.disabled = busy || !startup.supported;
+  elements.startupStatus.textContent = startup.error || (startup.enabled ? '已开启' : '未开启');
+
   renderReport(state.lastReport);
   renderStats(state.stats, session);
   renderExtraDomainList();
@@ -412,6 +422,35 @@ elements.extraDomainList.addEventListener('click', (event) => {
   }
 
   removeExtraDomain(button.dataset.removeDomain);
+});
+
+elements.settingsBtn.addEventListener('click', () => {
+  elements.settingsDialog.hidden = false;
+});
+
+elements.closeSettingsBtn.addEventListener('click', () => {
+  elements.settingsDialog.hidden = true;
+});
+
+elements.settingsDialog.addEventListener('click', (event) => {
+  if (event.target === elements.settingsDialog) {
+    elements.settingsDialog.hidden = true;
+  }
+});
+
+elements.startupToggle.addEventListener('change', async () => {
+  const enabled = elements.startupToggle.checked;
+  setBusy(true);
+
+  try {
+    const state = await window.focusJiejie.setStartupEnabled(enabled);
+    render(state);
+  } catch (error) {
+    setLocalError(error.message);
+    elements.startupToggle.checked = Boolean(latestState && latestState.startup && latestState.startup.enabled);
+  } finally {
+    setBusy(false);
+  }
 });
 
 elements.sessionForm.addEventListener('submit', async (event) => {

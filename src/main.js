@@ -7,6 +7,7 @@ const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } = require
 const hostsManager = require('./hostsManager');
 
 const BROWSER_RESTART_NOTICE = '如果封锁网站已经在浏览器中打开，旧连接可能继续可用；请重启浏览器或新开浏览器后再验证。';
+const STARTUP_ARG = '--startup';
 
 const TARGET_GROUPS = [
   {
@@ -201,12 +202,60 @@ function createAppIcon() {
   return createFallbackIcon();
 }
 
+function shouldStartHidden() {
+  return process.argv.includes(STARTUP_ARG);
+}
+
+function getStartupSettings() {
+  if (process.platform !== 'win32') {
+    return {
+      supported: false,
+      enabled: false,
+      error: '当前仅支持 Windows 开机自启。',
+    };
+  }
+
+  try {
+    const settings = app.getLoginItemSettings({
+      path: process.execPath,
+      args: [STARTUP_ARG],
+    });
+
+    return {
+      supported: true,
+      enabled: Boolean(settings.openAtLogin),
+      error: '',
+    };
+  } catch (error) {
+    return {
+      supported: false,
+      enabled: false,
+      error: error.message,
+    };
+  }
+}
+
+function setStartupEnabled(enabled) {
+  if (process.platform !== 'win32') {
+    throw new Error('当前仅支持 Windows 开机自启。');
+  }
+
+  app.setLoginItemSettings({
+    openAtLogin: Boolean(enabled),
+    path: process.execPath,
+    args: [STARTUP_ARG],
+  });
+
+  return getStartupSettings();
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1120,
     height: 780,
     minWidth: 960,
     minHeight: 680,
+    show: !shouldStartHidden(),
     title: '专注结界',
     backgroundColor: '#0f1518',
     icon: createAppIcon(),
@@ -847,6 +896,7 @@ function getPublicState() {
     settings: store.settings,
     stats: store.stats,
     interceptStatus,
+    startup: getStartupSettings(),
     lastError,
     paths: {
       storePath,
@@ -867,6 +917,10 @@ function registerIpc() {
   ipcMain.handle('app:breakSession', (_event, phrase) => breakSession(phrase));
   ipcMain.handle('app:restoreNow', () => restoreNow());
   ipcMain.handle('app:completeSession', () => completeSession());
+  ipcMain.handle('app:setStartupEnabled', (_event, enabled) => {
+    setStartupEnabled(enabled);
+    return getPublicState();
+  });
   ipcMain.handle('app:showWindow', () => {
     showWindow();
     return getPublicState();

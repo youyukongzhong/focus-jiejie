@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('focusJiejie', {
   breakSession: (phrase) => ipcRenderer.invoke('app:breakSession', phrase),
   restoreNow: () => ipcRenderer.invoke('app:restoreNow'),
   completeSession: () => ipcRenderer.invoke('app:completeSession'),
+  setStartupEnabled: (enabled) => ipcRenderer.invoke('app:setStartupEnabled', enabled),
   showWindow: () => ipcRenderer.invoke('app:showWindow'),
   onStateUpdated: (callback) => {
     const listener = (_event, state) => callback(state);

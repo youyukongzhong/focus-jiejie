@@ -55,6 +55,11 @@ const state = {
     http: { listening: false, error: '' },
     https: { listening: false, error: '' },
   },
+  startup: {
+    supported: true,
+    enabled: false,
+    error: '',
+  },
   lastError: '',
   paths: {
     storePath: 'smoke',
@@ -87,6 +92,12 @@ function mergeState(patch) {
   if (patch.hostsManaged !== undefined) {
     state.hostsManaged = patch.hostsManaged;
   }
+  if (patch.startup) {
+    state.startup = {
+      ...state.startup,
+      ...patch.startup,
+    };
+  }
 }
 
 contextBridge.exposeInMainWorld('focusJiejie', {
@@ -100,5 +111,9 @@ contextBridge.exposeInMainWorld('focusJiejie', {
   breakSession: async () => structuredClone(state),
   restoreNow: async () => structuredClone(state),
   completeSession: async () => structuredClone(state),
+  setStartupEnabled: async (enabled) => {
+    state.startup.enabled = Boolean(enabled);
+    return structuredClone(state);
+  },
   showWindow: async () => structuredClone(state),
 });
