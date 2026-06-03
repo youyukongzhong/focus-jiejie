@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>专注结界</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <span class="brand-shield">
+              <i class="brand-core"></i>
+              <i class="brand-gate gate-one"></i>
+              <i class="brand-gate gate-two"></i>
+            </span>
+          </div>
+          <div>
+            <h1>专注结界</h1>
+            <p id="statusLine">等待启动</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <span class="status-pill" id="adminBadge">权限检测中</span>
+          <span class="status-pill" id="hostsBadge">hosts 检测中</span>
+        </div>
+      </header>
+
+      <main class="main-grid">
+        <section class="ward-panel">
+          <div class="ward-stage" id="wardStage">
+            <div class="ward-sky">
+              <div class="base-field" aria-hidden="true">
+                <span class="defense-stone stone-top"></span>
+                <span class="defense-stone stone-right"></span>
+                <span class="defense-stone stone-bottom"></span>
+                <span class="defense-stone stone-left"></span>
+                <span class="wall-band wall-north"></span>
+                <span class="wall-band wall-south"></span>
+                <span class="wall-band wall-west"></span>
+                <span class="wall-band wall-east"></span>
+                <span class="resource-node node-left"></span>
+                <span class="resource-node node-right"></span>
+              </div>
+              <div class="ward-core" id="wardCore">
+                <div class="ring" id="progressRing">
+                  <div class="core-face">
+                    <span id="countdown">00:00</span>
+                    <small id="sessionLabel">未启动</small>
+                  </div>
+                </div>
+              </div>
+              <span class="impact impact-one"></span>
+              <span class="impact impact-two"></span>
+              <span class="ground-line"></span>
+            </div>
+          </div>
+
+          <div class="metric-row">
+            <div class="metric">
+              <span>结界完整度</span>
+              <strong id="integrityValue">100%</strong>
+              <div class="meter"><i id="integrityMeter"></i></div>
+            </div>
+            <div class="metric">
+              <span>本次抵挡</span>
+              <strong id="interceptsValue">0 次</strong>
+              <div class="meter amber"><i id="interceptsMeter"></i></div>
+            </div>
+            <div class="metric">
+              <span>结界等级</span>
+              <strong id="levelValue">Lv.1</strong>
+              <div class="meter blue"><i id="levelMeter"></i></div>
+            </div>
+          </div>
+
+          <form class="control-panel" id="sessionForm">
+            <div class="form-scroll">
+              <div class="field-row">
+                <div class="field-block">
+                  <span class="field-label">守界时长</span>
+                  <div class="duration-control">
+                    <div class="segmented" id="durationGroup">
+                      <button type="button" class="duration-btn" data-duration="10">10</button>
+                      <button type="button" class="duration-btn active" data-duration="25">25</button>
+                      <button type="button" class="duration-btn" data-duration="50">50</button>
+                      <button type="button" class="duration-btn" data-duration="90">90</button>
+                    </div>
+                    <label class="custom-duration" title="自定义 1 到 480 分钟">
+                      <input id="customDuration" type="number" min="1" max="480" step="1" value="30" aria-label="自定义守界分钟数" />
+                      <span>分钟</span>
+                    </label>
+                  </div>
+                </div>
+                <label>
+                  <span>目标结界</span>
+                  <select id="targetGroup"></select>
+                </label>
+              </div>
+
+              <label>
+                <span>本局要守住什么</span>
+                <input id="intention" type="text" maxlength="80" value="写完当前这一段" />
+              </label>
+
+              <div class="field-block domain-editor">
+                <span class="field-label">附加域名</span>
+                <div class="domain-add-row">
+                  <input id="extraDomainInput" type="text" spellcheck="false" placeholder="输入域名或网址，例如 https://www.google.com/" />
+                  <button type="button" class="add-domain-btn" id="addDomainBtn">添加</button>
+                </div>
+                <textarea id="extraDomains" hidden></textarea>
+                <ul class="extra-domain-list" id="extraDomainList"></ul>
+              </div>
+
+              <div class="switch-row">
+                <label class="switch">
+                  <input id="strictMode" type="checkbox" />
+                  <span></span>
+                  <b>死守模式</b>
+                </label>
+                <span id="strictHint">提前解除需要确认文本</span>
+              </div>
+            </div>
+
+            <div class="button-row">
+              <button type="submit" class="primary-btn" id="startBtn">启动结界</button>
+              <button type="button" class="danger-btn" id="breakBtn" disabled>提前解除</button>
+              <button type="button" class="ghost-btn" id="restoreBtn">恢复 hosts</button>
+            </div>
+          </form>
+        </section>
+
+        <aside class="side-panel">
+          <section class="report-panel">
+            <div class="section-title">
+              <h2>守界战报</h2>
+              <span id="reportStamp">暂无</span>
+            </div>
+            <div class="panel-body report-body">
+              <div class="report" id="reportBox">
+                <strong>还没有战报</strong>
+                <p>启动一次结界后，这里会记录结果。</p>
+              </div>
+            </div>
+            <button type="button" class="repair-btn" id="repairBtn">开 10 分钟修复局</button>
+          </section>
+
+          <section class="stats-panel">
+            <div class="section-title">
+              <h2>基地状态</h2>
+              <span id="streakValue">0 天</span>
+            </div>
+            <div class="panel-body">
+              <div class="stats-grid">
+                <div><span>累计守住</span><strong id="totalMinutes">0 分钟</strong></div>
+                <div><span>成功局数</span><strong id="completedSessions">0</strong></div>
+                <div><span>抵挡诱惑</span><strong id="totalIntercepts">0</strong></div>
+                <div><span>结界石</span><strong id="shieldStones">0</strong></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="domain-panel">
+            <div class="section-title">
+              <h2>封锁清单</h2>
+              <span id="domainCount">0 个</span>
+            </div>
+            <div class="panel-body">
+              <ul id="domainList"></ul>
+            </div>
+          </section>
+
+          <section class="achievement-panel">
+            <div class="section-title">
+              <h2>成就</h2>
+              <span id="achievementCount">0</span>
+            </div>
+            <div class="panel-body">
+              <ul id="achievementList"></ul>
+            </div>
+          </section>
+        </aside>
+      </main>
+
+      <footer class="footer">
+        <span id="errorBox"></span>
+        <span id="pathBox"></span>
+      </footer>
+    </div>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>
