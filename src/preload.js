@@ -7,6 +7,10 @@ contextBridge.exposeInMainWorld('focusJiejie', {
   restoreNow: () => ipcRenderer.invoke('app:restoreNow'),
   completeSession: () => ipcRenderer.invoke('app:completeSession'),
   setStartupEnabled: (enabled) => ipcRenderer.invoke('app:setStartupEnabled', enabled),
+  setLanguage: (language) => ipcRenderer.invoke('app:setLanguage', language),
+  checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
+  downloadUpdate: () => ipcRenderer.invoke('app:downloadUpdate'),
+  installUpdate: () => ipcRenderer.invoke('app:installUpdate'),
   showWindow: () => ipcRenderer.invoke('app:showWindow'),
   onStateUpdated: (callback) => {
     const listener = (_event, state) => callback(state);

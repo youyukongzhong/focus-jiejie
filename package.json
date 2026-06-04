@@ -1,6 +1,6 @@
 {
   "name": "focus-jiejie",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "专注结界：一键封锁诱惑网站的中文 Windows 专注桌面应用 MVP",
   "main": "src/main.js",
   "scripts": {
@@ -29,6 +29,13 @@
     "directories": {
       "output": "dist"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "youyukongzhong",
+        "repo": "focus-jiejie"
+      }
+    ],
     "files": [
       "src/**/*",
       "assets/**/*",
@@ -87,5 +94,8 @@
   "devDependencies": {
     "electron": "^42.3.2",
     "electron-builder": "^26.8.1"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
   }
 }

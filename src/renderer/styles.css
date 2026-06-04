@@ -589,7 +589,7 @@ h2 {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   overflow-y: auto;
   padding: 12px 16px 18px;
 }
@@ -853,14 +853,17 @@ button:not(:disabled):hover {
 }
 
 .switch-row {
-  min-height: 36px;
+  min-height: 48px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   position: relative;
   z-index: 2;
-  padding: 4px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(45, 69, 72, 0.72);
+  border-radius: 8px;
+  background: rgba(16, 25, 28, 0.72);
 }
 
 .switch {
@@ -1091,7 +1094,9 @@ button:not(:disabled):hover {
 }
 
 .footer {
+  height: 34px;
   min-height: 34px;
+  flex: 0 0 34px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1099,9 +1104,11 @@ button:not(:disabled):hover {
   padding: 0 24px 14px;
   color: var(--subtle);
   font-size: 12px;
+  overflow: hidden;
 }
 
-.settings-backdrop {
+.settings-backdrop,
+.strict-release-backdrop {
   position: fixed;
   inset: 0;
   z-index: 20;
@@ -1111,11 +1118,13 @@ button:not(:disabled):hover {
   background: rgba(7, 12, 14, 0.58);
 }
 
-.settings-backdrop[hidden] {
+.settings-backdrop[hidden],
+.strict-release-backdrop[hidden] {
   display: none;
 }
 
-.settings-panel {
+.settings-panel,
+.strict-release-panel {
   width: min(430px, calc(100vw - 36px));
   display: grid;
   gap: 16px;
@@ -1124,6 +1133,43 @@ button:not(:disabled):hover {
   border-radius: 8px;
   background: #152023;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+}
+
+.strict-release-panel {
+  width: min(480px, calc(100vw - 36px));
+}
+
+.strict-release-copy {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.strict-confirm-token {
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(242, 191, 77, 0.62);
+  border-radius: 8px;
+  color: #ffe7aa;
+  background: rgba(242, 191, 77, 0.1);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.strict-release-status {
+  min-height: 18px;
+  color: #ffb0a6;
+}
+
+.strict-release-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .settings-title {
@@ -1147,7 +1193,8 @@ button:not(:disabled):hover {
   line-height: 1;
 }
 
-.settings-switch {
+.settings-switch,
+.settings-select {
   min-height: 70px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -1159,12 +1206,19 @@ button:not(:disabled):hover {
   background: #10191c;
 }
 
+.settings-select {
+  grid-template-columns: minmax(0, 1fr) 150px;
+}
+
 .settings-switch strong,
-.settings-switch small {
+.settings-switch small,
+.settings-select strong,
+.settings-select small {
   display: block;
 }
 
-.settings-switch small {
+.settings-switch small,
+.settings-select small {
   margin-top: 5px;
   color: var(--subtle);
   font-size: 12px;
@@ -1217,8 +1271,44 @@ button:not(:disabled):hover {
   font-size: 13px;
 }
 
+.update-card {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(45, 69, 72, 0.75);
+  border-radius: 8px;
+  background: #10191c;
+}
+
+.update-card strong,
+.update-card small {
+  display: block;
+}
+
+.update-card small {
+  margin-top: 5px;
+  color: var(--subtle);
+  font-size: 12px;
+  line-height: 1.45;
+  max-height: 54px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+.update-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.update-actions button[hidden] {
+  display: none;
+}
+
 #errorBox {
   color: #ffb0a6;
+  display: block;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1226,7 +1316,10 @@ button:not(:disabled):hover {
 }
 
 #pathBox {
+  display: block;
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 48%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1288,6 +1381,13 @@ button:not(:disabled):hover {
   .switch-row {
     grid-template-columns: 1fr;
     align-items: flex-start;
+  }
+
+  .settings-select,
+  .settings-switch,
+  .update-actions,
+  .strict-release-actions {
+    grid-template-columns: 1fr;
   }
 
   #strictHint {

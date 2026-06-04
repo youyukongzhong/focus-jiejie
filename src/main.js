@@ -2,18 +2,108 @@ const fs = require('fs');
 const http = require('http');
 const net = require('net');
 const path = require('path');
-const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, Tray, shell } = require('electron');
+const { autoUpdater } = require('electron-updater');
 
 const hostsManager = require('./hostsManager');
 
 const BROWSER_RESTART_NOTICE = '如果封锁网站已经在浏览器中打开，旧连接可能继续可用；请重启浏览器或新开浏览器后再验证。';
 const STARTUP_ARG = '--startup';
+const RELEASES_URL = 'https://github.com/youyukongzhong/focus-jiejie/releases/latest';
+const UPDATE_CHECK_DELAY_MS = 8000;
+
+const TEXT = {
+  'zh-CN': {
+    file: '文件',
+    edit: '编辑',
+    view: '视图',
+    window: '窗口',
+    language: '语言',
+    showWindow: '显示主窗口',
+    restoreHosts: '立即恢复 hosts',
+    quit: '退出',
+    undo: '撤销',
+    redo: '重做',
+    cut: '剪切',
+    copy: '复制',
+    paste: '粘贴',
+    selectAll: '全选',
+    reload: '重新加载',
+    forceReload: '强制重新加载',
+    toggleDevTools: '开发者工具',
+    actualSize: '实际大小',
+    zoomIn: '放大',
+    zoomOut: '缩小',
+    toggleFullScreen: '全屏',
+    minimize: '最小化',
+    close: '关闭',
+    startTray: '开始 25 分钟 B站结界',
+    strictQuitBlocked: '死守模式中不可退出',
+    trayIdle: '打开专注结界',
+    tooltipIdle: '专注结界',
+    updateAvailableTitle: '发现新版本',
+    updateAvailableBody: (version) => `专注结界 ${version} 可以下载更新。`,
+    updateDownloadedTitle: '更新已下载',
+    updateDownloadedBody: '点击重启并安装，新版本会保留原安装位置。',
+    portableUpdateTitle: '发现新版本',
+    portableUpdateBody: '免安装版请手动下载新版 exe。',
+    interceptTitle: '已抵挡一次诱惑',
+    interceptBody: (count) => `本次已抵挡 ${count} 次，回到手头这件事。`,
+    bilibiliName: 'B站结界',
+    bilibiliSubtitle: '封住视频、直播、短链和常见 CDN',
+    wideName: '娱乐网站结界',
+    wideSubtitle: 'B站、微博、知乎热榜、抖音网页版',
+  },
+  'en-US': {
+    file: 'File',
+    edit: 'Edit',
+    view: 'View',
+    window: 'Window',
+    language: 'Language',
+    showWindow: 'Show Window',
+    restoreHosts: 'Restore hosts now',
+    quit: 'Quit',
+    undo: 'Undo',
+    redo: 'Redo',
+    cut: 'Cut',
+    copy: 'Copy',
+    paste: 'Paste',
+    selectAll: 'Select All',
+    reload: 'Reload',
+    forceReload: 'Force Reload',
+    toggleDevTools: 'Toggle Developer Tools',
+    actualSize: 'Actual Size',
+    zoomIn: 'Zoom In',
+    zoomOut: 'Zoom Out',
+    toggleFullScreen: 'Toggle Full Screen',
+    minimize: 'Minimize',
+    close: 'Close',
+    startTray: 'Start 25 min Bilibili ward',
+    strictQuitBlocked: 'Strict mode blocks quitting',
+    trayIdle: 'Open Focus Ward',
+    tooltipIdle: 'Focus Ward',
+    updateAvailableTitle: 'Update available',
+    updateAvailableBody: (version) => `Focus Ward ${version} is ready to download.`,
+    updateDownloadedTitle: 'Update downloaded',
+    updateDownloadedBody: 'Click to restart and install in the same folder.',
+    portableUpdateTitle: 'Update available',
+    portableUpdateBody: 'Portable builds need a manual download.',
+    interceptTitle: 'Temptation blocked',
+    interceptBody: (count) => `Blocked ${count} time(s). Return to the task.`,
+    bilibiliName: 'Bilibili Ward',
+    bilibiliSubtitle: 'Blocks video, live, short links, and common CDN domains',
+    wideName: 'Entertainment Ward',
+    wideSubtitle: 'Bilibili, Weibo, Zhihu Hot, and Douyin web',
+  },
+};
 
 const TARGET_GROUPS = [
   {
     id: 'bilibili',
     name: 'B站结界',
+    nameEn: 'Bilibili Ward',
     subtitle: '封住视频、直播、短链和常见 CDN',
+    subtitleEn: 'Blocks video, live, short links, and common CDN domains',
     domains: [
       'bilibili.com',
       'www.bilibili.com',
@@ -45,7 +135,9 @@ const TARGET_GROUPS = [
   {
     id: 'wide-focus',
     name: '娱乐网站结界',
+    nameEn: 'Entertainment Ward',
     subtitle: 'B站、微博、知乎热榜、抖音网页版',
+    subtitleEn: 'Bilibili, Weibo, Zhihu Hot, and Douyin web',
     domains: [
       'bilibili.com',
       'www.bilibili.com',
@@ -72,6 +164,7 @@ const DEFAULT_STORE = {
   lastReport: null,
   settings: {
     extraDomains: '',
+    language: 'zh-CN',
     lastDurationMinutes: 25,
     strictMode: false,
   },
@@ -104,9 +197,21 @@ let completingSession = false;
 let isQuitting = false;
 let httpBlockServer = null;
 let httpsProbeServer = null;
+let lastInterceptNotificationAt = 0;
 let interceptStatus = {
   http: { listening: false, error: '' },
   https: { listening: false, error: '' },
+};
+let updateStatus = {
+  state: 'idle',
+  supported: false,
+  portable: false,
+  available: false,
+  downloaded: false,
+  version: '',
+  percent: 0,
+  error: '',
+  lastCheckedAt: null,
 };
 const lastInterceptAt = new Map();
 
@@ -202,6 +307,32 @@ function createAppIcon() {
   return createFallbackIcon();
 }
 
+function getLanguage() {
+  return store.settings.language === 'en-US' ? 'en-US' : 'zh-CN';
+}
+
+function text(key, ...args) {
+  const value = (TEXT[getLanguage()] && TEXT[getLanguage()][key]) || TEXT['zh-CN'][key] || key;
+  return typeof value === 'function' ? value(...args) : value;
+}
+
+function setLanguage(language) {
+  store.settings.language = language === 'en-US' ? 'en-US' : 'zh-CN';
+  saveStore();
+  buildApplicationMenu();
+  updateTrayMenu();
+  broadcastState();
+}
+
+function getPublicTargetGroups() {
+  const english = getLanguage() === 'en-US';
+  return TARGET_GROUPS.map((group) => ({
+    ...group,
+    name: english ? group.nameEn : group.name,
+    subtitle: english ? group.subtitleEn : group.subtitle,
+  }));
+}
+
 function shouldStartHidden() {
   return process.argv.includes(STARTUP_ARG);
 }
@@ -284,11 +415,11 @@ function updateTrayMenu() {
   const active = isSessionActive();
   const menu = Menu.buildFromTemplate([
     {
-      label: active ? `守界中：${formatRemaining(getRemainingSeconds())}` : '打开专注结界',
+      label: active ? `${text('trayIdle')} ${formatRemaining(getRemainingSeconds())}` : text('trayIdle'),
       click: showWindow,
     },
     {
-      label: '开始 25 分钟 B站结界',
+      label: text('startTray'),
       enabled: !active,
       click: () => startSession({
         durationMinutes: 25,
@@ -299,50 +430,53 @@ function updateTrayMenu() {
       }).catch(setError),
     },
     {
-      label: '立即恢复 hosts',
+      label: text('restoreHosts'),
+      enabled: !active && hostsManager.hasManagedBlock(),
       click: () => restoreNow().catch(setError),
     },
     { type: 'separator' },
     {
-      label: isStrictSessionActive() ? '死守模式中不可退出' : '退出',
+      label: isStrictSessionActive() ? text('strictQuitBlocked') : text('quit'),
       enabled: !isStrictSessionActive(),
-      click: async () => {
-        if (isStrictSessionActive()) {
-          showStrictQuitBlocked();
-          return;
-        }
-
-        if (isSessionActive()) {
-          const choice = dialog.showMessageBoxSync(mainWindow, {
-            type: 'warning',
-            title: '退出前恢复 hosts',
-            message: '当前仍在守界中，退出前需要先恢复 hosts。',
-            detail: '这样可以避免应用退出后网站仍被系统 hosts 文件封锁。',
-            buttons: ['继续运行', '恢复 hosts 并退出'],
-            defaultId: 0,
-            cancelId: 0,
-          });
-
-          if (choice !== 1) {
-            return;
-          }
-
-          try {
-            await restoreNow();
-          } catch (error) {
-            setError(error);
-            return;
-          }
-        }
-
-        isQuitting = true;
-        app.quit();
-      },
+      click: requestQuit,
     },
   ]);
 
   tray.setContextMenu(menu);
-  tray.setToolTip(active ? `专注结界：剩余 ${formatRemaining(getRemainingSeconds())}` : '专注结界');
+  tray.setToolTip(active ? `${text('tooltipIdle')} ${formatRemaining(getRemainingSeconds())}` : text('tooltipIdle'));
+}
+
+async function requestQuit() {
+  if (isStrictSessionActive()) {
+    showStrictQuitBlocked();
+    return;
+  }
+
+  if (isSessionActive()) {
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'warning',
+      title: '退出前恢复 hosts',
+      message: '当前仍在守界中，退出前需要先结束本次守界。',
+      detail: '选择结束并退出会按提前解除处理，避免应用退出后 hosts 仍被系统封锁。',
+      buttons: ['继续运行', '提前解除并退出'],
+      defaultId: 0,
+      cancelId: 0,
+    });
+
+    if (choice !== 1) {
+      return;
+    }
+
+    try {
+      await breakSession('');
+    } catch (error) {
+      setError(error);
+      return;
+    }
+  }
+
+  isQuitting = true;
+  app.quit();
 }
 
 function createTray() {
@@ -358,6 +492,82 @@ function showWindow() {
 
   mainWindow.show();
   mainWindow.focus();
+}
+
+function buildApplicationMenu() {
+  const language = getLanguage();
+  const active = isSessionActive();
+  const template = [
+    {
+      label: text('file'),
+      submenu: [
+        { label: text('showWindow'), click: showWindow },
+        {
+          label: text('restoreHosts'),
+          enabled: !active && hostsManager.hasManagedBlock(),
+          click: () => restoreNow().catch(setError),
+        },
+        { type: 'separator' },
+        {
+          label: isStrictSessionActive() ? text('strictQuitBlocked') : text('quit'),
+          enabled: !isStrictSessionActive(),
+          click: requestQuit,
+        },
+      ],
+    },
+    {
+      label: text('edit'),
+      submenu: [
+        { label: text('undo'), role: 'undo' },
+        { label: text('redo'), role: 'redo' },
+        { type: 'separator' },
+        { label: text('cut'), role: 'cut' },
+        { label: text('copy'), role: 'copy' },
+        { label: text('paste'), role: 'paste' },
+        { label: text('selectAll'), role: 'selectAll' },
+      ],
+    },
+    {
+      label: text('view'),
+      submenu: [
+        { label: text('reload'), role: 'reload' },
+        { label: text('forceReload'), role: 'forceReload' },
+        { label: text('toggleDevTools'), role: 'toggleDevTools' },
+        { type: 'separator' },
+        { label: text('actualSize'), role: 'resetZoom' },
+        { label: text('zoomIn'), role: 'zoomIn' },
+        { label: text('zoomOut'), role: 'zoomOut' },
+        { type: 'separator' },
+        { label: text('toggleFullScreen'), role: 'togglefullscreen' },
+      ],
+    },
+    {
+      label: text('language'),
+      submenu: [
+        {
+          label: '中文',
+          type: 'radio',
+          checked: language === 'zh-CN',
+          click: () => setLanguage('zh-CN'),
+        },
+        {
+          label: 'English',
+          type: 'radio',
+          checked: language === 'en-US',
+          click: () => setLanguage('en-US'),
+        },
+      ],
+    },
+    {
+      label: text('window'),
+      submenu: [
+        { label: text('minimize'), role: 'minimize' },
+        { label: text('close'), role: 'close' },
+      ],
+    },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 function parseExtraDomains(value) {
@@ -626,7 +836,215 @@ function recordIntercept(kind, host) {
   store.stats.resistedImpulses += uncountedBefore + 1;
   store.currentSession.integrity = Math.max(35, 100 - store.currentSession.intercepts * 4);
   saveStore();
+  showInterceptNotification(host, store.currentSession.intercepts);
   broadcastState();
+}
+
+function showInterceptNotification(host, count) {
+  if (!Notification.isSupported()) {
+    return;
+  }
+
+  const now = Date.now();
+  if (now - lastInterceptNotificationAt < 1800) {
+    return;
+  }
+
+  lastInterceptNotificationAt = now;
+  const notification = new Notification({
+    title: text('interceptTitle'),
+    body: text('interceptBody', count),
+    icon: getRasterIconPath() || undefined,
+    silent: true,
+  });
+
+  notification.on('click', showWindow);
+  notification.show();
+}
+
+function isPortableBuild() {
+  return Boolean(process.env.PORTABLE_EXECUTABLE_FILE);
+}
+
+function canAutoUpdate() {
+  return app.isPackaged && !isPortableBuild();
+}
+
+function refreshUpdateSupport() {
+  updateStatus = {
+    ...updateStatus,
+    supported: canAutoUpdate(),
+    portable: isPortableBuild(),
+  };
+}
+
+function setUpdateStatus(patch) {
+  refreshUpdateSupport();
+  updateStatus = {
+    ...updateStatus,
+    ...patch,
+  };
+  broadcastState();
+}
+
+function showUpdateNotification(title, body, onClick) {
+  if (!Notification.isSupported()) {
+    return;
+  }
+
+  const notification = new Notification({
+    title,
+    body,
+    icon: getRasterIconPath() || undefined,
+    silent: true,
+  });
+
+  if (onClick) {
+    notification.on('click', onClick);
+  }
+
+  notification.show();
+}
+
+function getErrorMessage(error) {
+  return error && error.message ? error.message : String(error || '');
+}
+
+function handleUpdateError(error) {
+  setUpdateStatus({
+    state: 'error',
+    error: getErrorMessage(error),
+  });
+}
+
+function setupAutoUpdater() {
+  refreshUpdateSupport();
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    setUpdateStatus({
+      state: 'checking',
+      error: '',
+      lastCheckedAt: new Date().toISOString(),
+    });
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    setUpdateStatus({
+      state: 'available',
+      available: true,
+      downloaded: false,
+      version: info.version || '',
+      percent: 0,
+      error: '',
+    });
+    showUpdateNotification(
+      text('updateAvailableTitle'),
+      text('updateAvailableBody', info.version || ''),
+      () => downloadUpdate().catch(handleUpdateError)
+    );
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    setUpdateStatus({
+      state: 'none',
+      available: false,
+      downloaded: false,
+      percent: 0,
+      error: '',
+    });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    setUpdateStatus({
+      state: 'downloading',
+      percent: Math.round(progress.percent || 0),
+      error: '',
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    setUpdateStatus({
+      state: 'downloaded',
+      available: true,
+      downloaded: true,
+      version: info.version || updateStatus.version,
+      percent: 100,
+      error: '',
+    });
+    showUpdateNotification(
+      text('updateDownloadedTitle'),
+      text('updateDownloadedBody'),
+      installDownloadedUpdate
+    );
+  });
+
+  autoUpdater.on('error', (error) => {
+    handleUpdateError(error);
+  });
+}
+
+async function checkForUpdates(manual = false) {
+  try {
+    refreshUpdateSupport();
+
+    if (isPortableBuild()) {
+      setUpdateStatus({
+        state: 'manual-download',
+        supported: false,
+        portable: true,
+        error: '',
+        lastCheckedAt: new Date().toISOString(),
+      });
+      if (manual) {
+        showUpdateNotification(text('portableUpdateTitle'), text('portableUpdateBody'), () => shell.openExternal(RELEASES_URL));
+      }
+      return getPublicState();
+    }
+
+    if (!canAutoUpdate()) {
+      setUpdateStatus({
+        state: 'unsupported',
+        supported: false,
+        error: app.isPackaged ? '' : '开发模式不执行自动更新。',
+        lastCheckedAt: new Date().toISOString(),
+      });
+      return getPublicState();
+    }
+
+    await autoUpdater.checkForUpdates();
+  } catch (error) {
+    setUpdateStatus({
+      state: 'error',
+      error: getErrorMessage(error),
+      lastCheckedAt: new Date().toISOString(),
+    });
+  }
+  return getPublicState();
+}
+
+async function downloadUpdate() {
+  try {
+    if (!canAutoUpdate()) {
+      return checkForUpdates(true);
+    }
+
+    setUpdateStatus({
+      state: 'downloading',
+      error: '',
+    });
+    await autoUpdater.downloadUpdate();
+  } catch (error) {
+    handleUpdateError(error);
+  }
+  return getPublicState();
+}
+
+function installDownloadedUpdate() {
+  if (canAutoUpdate() && updateStatus.downloaded) {
+    autoUpdater.quitAndInstall(false, true);
+  }
 }
 
 function renderBlockedPage(host) {
@@ -760,6 +1178,7 @@ async function startSession(payload) {
   saveStore();
   startInterceptServers();
   updateTrayMenu();
+  buildApplicationMenu();
   broadcastState();
 
   return {
@@ -802,6 +1221,7 @@ async function completeSession() {
     completingSession = false;
     saveStore();
     updateTrayMenu();
+    buildApplicationMenu();
     broadcastState();
   }
 
@@ -830,12 +1250,17 @@ async function breakSession(phrase) {
   lastError = '';
   saveStore();
   updateTrayMenu();
+  buildApplicationMenu();
   broadcastState();
 
   return getPublicState();
 }
 
 async function restoreNow() {
+  if (isSessionActive()) {
+    throw new Error('守界进行中不能直接恢复 hosts，请使用“提前解除”。');
+  }
+
   const restoreResult = hostsManager.restoreBlock({ backupDir });
   stopInterceptServers();
 
@@ -854,6 +1279,7 @@ async function restoreNow() {
   lastError = '';
   saveStore();
   updateTrayMenu();
+  buildApplicationMenu();
   broadcastState();
 
   return getPublicState();
@@ -883,7 +1309,8 @@ function getPublicState() {
     hostsPath: hostsManager.HOSTS_PATH,
     hostsManaged: hostsManager.hasManagedBlock(),
     strictConfirmText: STRICT_CONFIRM_TEXT,
-    targetGroups: TARGET_GROUPS,
+    language: getLanguage(),
+    targetGroups: getPublicTargetGroups(),
     currentSession: store.currentSession
       ? {
           ...store.currentSession,
@@ -897,6 +1324,11 @@ function getPublicState() {
     stats: store.stats,
     interceptStatus,
     startup: getStartupSettings(),
+    update: {
+      ...updateStatus,
+      supported: canAutoUpdate(),
+      portable: isPortableBuild(),
+    },
     lastError,
     paths: {
       storePath,
@@ -921,6 +1353,16 @@ function registerIpc() {
     setStartupEnabled(enabled);
     return getPublicState();
   });
+  ipcMain.handle('app:setLanguage', (_event, language) => {
+    setLanguage(language);
+    return getPublicState();
+  });
+  ipcMain.handle('app:checkForUpdates', () => checkForUpdates(true));
+  ipcMain.handle('app:downloadUpdate', () => downloadUpdate());
+  ipcMain.handle('app:installUpdate', () => {
+    installDownloadedUpdate();
+    return getPublicState();
+  });
   ipcMain.handle('app:showWindow', () => {
     showWindow();
     return getPublicState();
@@ -933,6 +1375,8 @@ app.whenReady().then(() => {
   backupDir = path.join(app.getPath('userData'), 'hosts-backups');
   adminStatus = hostsManager.isAdmin();
   loadStore();
+  buildApplicationMenu();
+  setupAutoUpdater();
 
   if (isSessionActive() && Date.now() < store.currentSession.endsAt) {
     startInterceptServers();
@@ -943,6 +1387,7 @@ app.whenReady().then(() => {
   createTray();
   setInterval(tick, 1000);
   broadcastState();
+  setTimeout(() => checkForUpdates(false).catch(handleUpdateError), UPDATE_CHECK_DELAY_MS);
 });
 
 app.on('activate', () => {
